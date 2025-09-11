@@ -72,11 +72,11 @@ class dSigma_meascorr_class:
 
         return dSigma_corr_numerator
     
-    def _get_dSigma_corr_numerator(self, dpz, Omm, w0, bin1, z, nz):
+    def _get_dSigma_corr_numerator(self, dpz, Omm, w0):
         zl = self.zl
         #zs = self.zs - dpz # This is the definition in HSC Y1 2x2pt and HSC Y3 3x2pt analyses.
-        zs = z + dpz # This is the definition of CosmoSIS
-        sumwlssigcritinvPz = nz/np.sum(nz)/len(zl)
+        zs = self.zs + dpz # This is the definition of CosmoSIS
+        sumwlssigcritinvPz = self.sumwlssigcritinvPz
         
         cosmo = self._get_cosmo(Omm, w0)
 
@@ -90,15 +90,37 @@ class dSigma_meascorr_class:
                 continue
             Sigma_cr_inv_array = 1./sigcrit_prefactor * (1.+zl)*chi_zl*(1.-chi_zl/chi_zs[j])
             Sigma_cr_inv_array[Sigma_cr_inv_array <0.0] = 0.0
-            dSigma_corr_numerator += np.sum(Sigma_cr_inv_array*sumwlssigcritinvPz[j])
+            dSigma_corr_numerator += np.sum(Sigma_cr_inv_array*sumwlssigcritinvPz[:,j])
 
         return dSigma_corr_numerator
+    
+#     def _get_dSigma_corr_numerator(self, dpz, Omm, w0, bin1, z, nz):
+#         zl = self.zl
+#         #zs = self.zs - dpz # This is the definition in HSC Y1 2x2pt and HSC Y3 3x2pt analyses.
+#         zs = z + dpz # This is the definition of CosmoSIS
+#         sumwlssigcritinvPz = nz/np.sum(nz)/len(zl)
+        
+#         cosmo = self._get_cosmo(Omm, w0)
+
+#         zl_rough = np.linspace(zl.min(), zl.max()+0.001,100) # Max has padding
+#         chi_zl = ius(zl_rough, cosmo.comoving_distance(zl_rough).value)(zl)
+#         chi_zs = cosmo.comoving_distance(zs).value
+
+#         dSigma_corr_numerator = 0.0
+#         for j in range(len(zs)):
+#             if chi_zs[j] <= 0.0:
+#                 continue
+#             Sigma_cr_inv_array = 1./sigcrit_prefactor * (1.+zl)*chi_zl*(1.-chi_zl/chi_zs[j])
+#             Sigma_cr_inv_array[Sigma_cr_inv_array <0.0] = 0.0
+#             dSigma_corr_numerator += np.sum(Sigma_cr_inv_array*sumwlssigcritinvPz[j])
+
+#         return dSigma_corr_numerator
     
     def get_corr_factor(self, dpz, Omm, w0, bin1, z, nz):
         # dSigma_corr = self._get_dSigma_corr_numerator(dpz, Omm, w0, bin1, z, nz)/self._get_dSigma_corr_denominator(0.0, self.config['Omm'], self.config['w0'])
         # print(dpz, Omm, w0)
         # print(0.0, self.config['Omm'], self.config['w0'])
-        dSigma_corr = self._get_dSigma_corr_denominator(dpz, Omm, w0)/self._get_dSigma_corr_denominator(0.0, self.config['Omm'], self.config['w0'])
+        dSigma_corr = self._get_dSigma_corr_numerator(dpz, Omm, w0)/self._get_dSigma_corr_numerator(0.0, self.config['Omm'], self.config['w0'])
         
         # print(dSigma_corr)
         

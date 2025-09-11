@@ -37,14 +37,11 @@ def execute(block, config):
         for source_id in range(1, nbin_source+1):
             
             f_ds = block.get_double('f_ds', 'bin_{0}_{1}'.format(lens_id,source_id), 1.0)
-            
-            ds_ij =  block['galaxy_shear_xi', 'bin_{0}_{1}'.format(lens_id,source_id)]
+            ds_ij =  block['galaxy_shear_xi', 'bin_{0}_{1}'.format(lens_id,source_id)]/f_ds
             
             ds0 = ius(rp, ds_ij)(r0)
                         
             block['galaxy_shear_xi', 'bin_{0}_{1}'.format(lens_id,source_id)] += f_ds * upsilon_correction(rp, r0, delta_sigma_r0, ds0)
-            
-            
             
     return 0
             

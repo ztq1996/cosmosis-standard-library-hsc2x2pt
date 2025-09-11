@@ -391,7 +391,6 @@ class TwoPointLikelihood(GaussianLikelihood):
             angles = list(zip(spectrum.angle_min, spectrum.angle_max))
         else:
             angles = spectrum.angle
-        
         # We store the nominal mid-points for plotting later on, etc.
         angle_mids = spectrum.angle
 
@@ -411,6 +410,7 @@ class TwoPointLikelihood(GaussianLikelihood):
             # The extra object will either be a spline (for interpolated spectra)
             # or theta mid-point values (for bin-averaged ones, e.g. for plotting)
             theory, extra = theory_spec.get_spectrum_value(b1, b2, angle)
+            # print(b1, b2, angle, angle_mid, theory)
 
             # We can only record the splines for non-bin-averaged values
             if not theory_spec.is_bin_averaged:
@@ -432,7 +432,7 @@ class TwoPointLikelihood(GaussianLikelihood):
         angle_vector = np.array(angle_vector)
         bin1_vector = np.array(bin1_vector, dtype=int)
         bin2_vector = np.array(bin2_vector, dtype=int)
-
+        # print(theory_vector.shape)
         return theory_vector, angle_vector, bin1_vector, bin2_vector
 
 

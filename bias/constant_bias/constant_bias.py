@@ -6,7 +6,8 @@ def setup(options):
 
 
 def execute(block, config):
-    b = block['galaxy_bias', 'b']
+    # b = block['galaxy_bias', 'b']
+    b = block['galaxy_bias_parameters', 'b1_1']
 
     # Copy the non-linear matter power to both galaxy-power and
     # matter-galaxy cross power (the latter is used in lensing-position spectra)

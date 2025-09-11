@@ -143,7 +143,7 @@ def _get_R_sigma(k, z, Delta_L):
         R (float): :math:`R` satisfying :math:`\\sigma(R)=1`.
     """
     if _sigma(k, Delta_L, 0.0) < 1:
-        print('Warning pyhalofit: sigma(0)<0 for z=%f. Set R_sigma=%f.'%(z, _get_R_sigma_max(k)))
+        # print('Warning pyhalofit: sigma(0)<0 for z=%f. Set R_sigma=%f.'%(z, _get_R_sigma_max(k)))
         R_sigma = 0.01/k.max()
     else:
         # init guess : [1/Mpc]   Takada & Jain (2004) fiducial model
