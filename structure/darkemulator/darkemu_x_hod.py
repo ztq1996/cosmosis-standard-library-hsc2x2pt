@@ -125,8 +125,8 @@ def execute(block, config):
     # unpack radial bin
     if bin_avg:
         # We input the lower edge of each radial bin
-        rp_wp = rp_edges['wp']
-        rp_ds = rp_edges['ds']
+        rp_wp = rp_edges['wp'][:-1]
+        rp_ds = rp_edges['ds'][:-1]
         dlnrp_wp = np.log(rp_wp[1]/rp_wp[0])
         dlnrp_ds = np.log(rp_ds[1]/rp_ds[0])
     else:
@@ -182,7 +182,7 @@ def execute(block, config):
         block[o, "sep_name"] = "rp"
         block[o, "save_name"] = section_names['{}_save_name'.format(n)]
         block[o, "bin_avg"] = bin_avg
-        if n in rp_edges:
+        if bin_avg:
             block[o, "rp_edges"] = rp_edges[n]
             block.put_metadata(o, "rp_edges", "unit", "rad")
     

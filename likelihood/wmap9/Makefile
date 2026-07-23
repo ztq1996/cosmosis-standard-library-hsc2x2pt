@@ -10,7 +10,7 @@ endif
 
 F90    = ${FC}
 INCS = -I$(CFITSIO_INC) 
-LIBS = ${LAPACK_LINK} -L ${CFITSIO_LIB} -lcfitsio
+LIBS = ${LAPACK_LINK} -L ${CFITSIO_LIB} -lcfitsio -lblas
 USER_FFLAGS+=-Wl,-rpath,${PWD}
 USER_LDFLAGS+=-Wl,-rpath,${PWD} -lcosmosis
 
