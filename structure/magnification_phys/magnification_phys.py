@@ -77,7 +77,7 @@ class magnification_class:
         
         chi= self.z2chi(self.pk_nlin_data[0][sel]) # [Mpc/h]
         integrand   = window(chi)*pltable
-        clSigmacrit = integrate.simps(integrand.T, chi, axis=0)
+        clSigmacrit = integrate.simpson(integrand.T, chi, axis=0)
         clSigmacrit*= prefactor/1e12 # hMsun/pc^2
         return l, clSigmacrit
     
