@@ -7,6 +7,45 @@ from cosmosis.datablock import names, option_section
 from dark_emulator import model_hod
 import numpy as np
 import os, sys
+
+
+def _disable_colossus_persistence():
+    """
+    Stop colossus from writing one cache file per cosmology.
+
+    With sat_dist_type = NFW, dark_emulator's _compute_p_hm_satdist_NFW calls
+    colossus.cosmology.setCosmology('myCosmo', params) for every cosmology it is
+    handed.  colossus defaults to persistence = 'rw', and its cache filename is
+    keyed by a hash of the parameters, so an MCMC pickles a new ~5.5 kB file into
+    $HOME/.colossus/cache/cosmology/ at every accepted step -- ~10 files/s here,
+    i.e. ~650k files and ~3.6 GB per 18 h chain, in a shared /home.
+
+    Setting colossus.settings.PERSISTENCE = '' at run time does NOT work:
+    Cosmology.__init__ takes `persistence = settings.PERSISTENCE` as a default
+    argument, which Python binds once at import.  The value has to be passed at
+    the call, hence this wrapper.
+
+    Cost of turning it off: none measurable.  The cache only ever helps when the
+    same cosmology recurs, which does not happen in an MCMC.  (Do not reach for
+    interpolation = False instead -- that is ~29x slower.)
+    """
+    try:
+        from colossus.cosmology import cosmology as _colcos
+    except ImportError:
+        return          # no colossus -> sat_dist_type = NFW is unusable anyway
+    if getattr(_colcos.setCosmology, "_persistence_disabled", False):
+        return
+    _orig = _colcos.setCosmology
+
+    def setCosmology(cosmo_name, params=None, **kwargs):
+        kwargs.setdefault("persistence", "")
+        return _orig(cosmo_name, params, **kwargs)
+
+    setCosmology._persistence_disabled = True
+    _colcos.setCosmology = setCosmology
+
+
+_disable_colossus_persistence()
 dirname = os.path.split(__file__)[0]
 twopoint_path = os.path.join(dirname,"..","..","likelihood","2pt")
 sys.path.insert(0, twopoint_path)
