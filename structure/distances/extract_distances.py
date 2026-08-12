@@ -34,7 +34,9 @@ def execute(block, config):
     w0         = block[pars, "w"]
     mnu   = block[pars, "mnu"]
     omnuh2     = 0.00064 * (mnu/0.06)
-    Omm        = (ombh2 + omch2 + ombh2)/h**2
+    # The third term is the massive-neutrino density, not ombh2 again; with the
+    # typo Omm came out 15% high and D_C was off by 1-4% over z = 0.25-2.
+    Omm        = (ombh2 + omch2 + omnuh2)/h**2
     Omk   = block[pars, "omega_k"]
     Omde       = 1.0-Omm-Omk
     wa    = block[pars, "wa"]
