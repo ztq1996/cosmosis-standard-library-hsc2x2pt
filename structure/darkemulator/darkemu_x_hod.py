@@ -195,10 +195,14 @@ def execute(block, config):
         
         # correction factors 
         f_rp = block.get_double(section_names['f_rp'], 'bin_{0}'.format(i+1), 1.0)
-        f_wp = block.get_double(section_names['f_wp'], 'bin_{0}'.format(i+1), 1.0) # multiplied to pimax
+        # f_wp = E(zl;C_ref)/E(zl;C) rescales the line-of-sight separation,
+        # Pi = f_wp * Pi_ref (Sugiyama et al. 2023, arXiv:2304.00705, Eq. 21).
+        # wp = 2 \int dPi xi_gg carries one power of that length, so on top of
+        # pimax -> f_wp*pimax the integral picks up the Jacobian 1/f_wp (Eq. 22).
+        f_wp = block.get_double(section_names['f_wp'], 'bin_{0}'.format(i+1), 1.0)
         
         # update wp
-        block[section_names['wp_out'], 'bin_{0}_{0}'.format(i+1)] = darkemu_x_hod.get_wp(f_rp*rp_wp, zl, pimax=f_wp*pimax, dlnrp=dlnrp_wp, rsd=do_Kaiser)
+        block[section_names['wp_out'], 'bin_{0}_{0}'.format(i+1)] = darkemu_x_hod.get_wp(f_rp*rp_wp, zl, pimax=f_wp*pimax, dlnrp=dlnrp_wp, rsd=do_Kaiser) / f_wp
             
         # Compute the dSigma without the correction of Sigmacrit
         ds = darkemu_x_hod.get_ds(f_rp*rp_ds, zl, dlnrp=dlnrp_ds)
