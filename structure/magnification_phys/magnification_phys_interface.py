@@ -167,7 +167,10 @@ def execute(block, config):
         
         # correction factors 
         f_rp = block.get_double(section_names['f_rp'], 'bin_{0}'.format(i+1), 1.0)
-        f_wp = block.get_double(section_names['f_wp'], 'bin_{0}'.format(i+1), 1.0) # multiplied to pimax
+        # multiplied to pimax; if the wp magnification term below is ever enabled it
+        # also needs the 1/f_wp Jacobian (Sugiyama+2023, arXiv:2304.00705, Eq. 21-22),
+        # as in darkemu_x_hod.py / minimalbias_interface.py.
+        f_wp = block.get_double(section_names['f_wp'], 'bin_{0}'.format(i+1), 1.0)
         
         # update wp
         block[section_names['wp_out']+'_gg', 'bin_{0}_{0}'.format(i+1)]  = block[section_names['wp_out'], 'bin_{0}_{0}'.format(i+1)]
@@ -179,10 +182,12 @@ def execute(block, config):
             # print(block[section_names['nz_source'], "z"], block[section_names['nz_source'], "bin_{0}".format(j+1)])
             mag.set_nz_source(block[section_names['nz_source'], "z"], block[section_names['nz_source'], "bin_{0}".format(j+1)])
             f_ds = block.get_double(section_names['f_ds'], 'bin_{0}_{1}'.format(i+1,j+1), 1.0)
+            ds_mag = mag.get_ds_mag(zl, f_rp*rp_ds, dlnrp_ds)
             block[section_names['ds_out']+'_gG', 'bin_{0}_{1}'.format(i+1,j+1)]  = block[section_names['ds_out'], 'bin_{0}_{1}'.format(i+1,j+1)]
-            block[section_names['ds_out']      , 'bin_{0}_{1}'.format(i+1,j+1)] += f_ds * mag.get_ds_mag(zl, f_rp*rp_ds, dlnrp_ds)
-            
+            block[section_names['ds_out']      , 'bin_{0}_{1}'.format(i+1,j+1)] += f_ds * ds_mag
+
             if save_mag:
-                block['ds_mag', 'bin_{0}_{1}'.format(i+1,j+1)] = mag.get_ds_mag(zl, f_rp*rp_ds, dlnrp_ds)
+                # reuse the array above; recomputing it here doubled the module's cost
+                block['ds_mag', 'bin_{0}_{1}'.format(i+1,j+1)] = ds_mag
     
     return 0

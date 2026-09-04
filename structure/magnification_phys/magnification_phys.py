@@ -15,6 +15,7 @@ class magnification_class:
     def __init__(self, config = None):
         self.config = {'verbose':True}
         self.config.update(config or {})
+        self._pltable = None
     
     def set_param(self, alpha, Omm):
         """
@@ -27,12 +28,14 @@ class magnification_class:
         set nonlinear matter power spectrum
         """
         self.pk_nlin_data = [z, k, pknonlin]
-        
+        self._pltable = None
+
     def set_z2chi(self, z, chi):
         """
         set relation between redshift z and comoving distance chi.
         """
         self.z2chi = ius(z, chi)
+        self._pltable = None
         
     def set_nz_source(self, z, nz):
         """
@@ -71,10 +74,16 @@ class magnification_class:
         
         l = np.logspace(0, 5, 1000)
         sel = self.pk_nlin_data[0] > 0
-        pltable = self._kzpktable2pltable(self.pk_nlin_data[0][sel], 
-                                          self.pk_nlin_data[1], 
-                                          self.pk_nlin_data[2][sel, :], l)
-        
+        # P(l/chi, z) depends only on the power spectrum and the distances, not on
+        # which lens-source pair we are on, so it is built once per cosmology and
+        # reused across the (nbin_lens x nbin_source) calls. set_pk_nlin_data and
+        # set_z2chi drop the cache.
+        if self._pltable is None:
+            self._pltable = self._kzpktable2pltable(self.pk_nlin_data[0][sel],
+                                                    self.pk_nlin_data[1],
+                                                    self.pk_nlin_data[2][sel, :], l)
+        pltable = self._pltable
+
         chi= self.z2chi(self.pk_nlin_data[0][sel]) # [Mpc/h]
         integrand   = window(chi)*pltable
         clSigmacrit = integrate.simpson(integrand.T, chi, axis=0)
@@ -146,53 +155,35 @@ def get_Sigmacr_Cl_window(zs_in, nzs_in, zl_in, nzl_in, z2chi):
     # print(chil)
     # print(chis)
     
-    c0, c1, c2 = [], [], []
-    for _zs, _nzs, _chis in zip(zs, nzs_normed, chis):
-        _c0, _c1, _c2 = [], [], []
-        for _zl, _nzl, _chil in zip(zl, nzl_normed, chil):
-            if _zl >= _zs:
-                _c0.append(0.0)
-                _c1.append(0.0)
-                _c2.append(0.0)
-            else:
-                if 1+_zl==0.0:
-                    print("1+zl = ", 1+_zl)
-                if _chil==0.0:
-                    print("_chil= ", _chil)
-                if np.abs(_chis-_chil)<1e-3:
-                    # print("(_chis-_chil)= ", (_chis-_chil))
-                    _c0.append(0.0)
-                    _c1.append(0.0)
-                    _c2.append(0.0)
-                    continue
-                _c0.append(_nzs*_nzl/(1+_zl)/_chil**2/(_chis-_chil) * _chil*_chis )
-                _c1.append(_nzs*_nzl/(1+_zl)/_chil**2/(_chis-_chil) * (_chil+_chis) )
-                _c2.append(_nzs*_nzl/(1+_zl)/_chil**2/(_chis-_chil) )
-        c0.append(_c0)
-        c1.append(_c1)
-        c2.append(_c2)
-        
-    c0 = np.array(c0)
-    c1 = np.array(c1)
-    c2 = np.array(c2)
-    
-    # print(c0,c1,c2)
-    
-    zlMat, zsMat = np.meshgrid(zl, zs)
-    assert np.all(c0.shape == zlMat.shape)
-    assert np.all(c0.shape == zsMat.shape)
-    
+    # c0/c1/c2 on the (source, lens) grid. Rows = source, columns = lens, matching
+    # the meshgrid(zl, zs) convention the masking below used to rely on.
+    dchi = chis[:, None] - chil[None, :]                       # (ns, nl)
+    good = (zl[None, :] < zs[:, None]) & (np.abs(dchi) >= 1e-3)
+    num = np.zeros_like(dchi)
+    np.divide(nzs_normed[:, None] * nzl_normed[None, :],
+              (1 + zl[None, :]) * chil[None, :]**2, out=num, where=good)
+    base = np.zeros_like(dchi)
+    np.divide(num, dchi, out=base, where=good)
+    c0 = base * (chil[None, :] * chis[:, None])
+    c1 = base * (chil[None, :] + chis[:, None])
+    c2 = base
+
     z = np.linspace(0.0, zl[zl>0].max()*1.01, 100)
     chi = z2chi(z) # Mpc/h
-    c0_chi, c1_chi, c2_chi = [], [], []
-    for _z, _chi in zip(z, chi):
-        mask = np.logical_and(zlMat>_z, zsMat>_z, zsMat>zlMat)
-        c0_chi.append( np.sum(c0[mask])*dzl*dzs )
-        c1_chi.append( np.sum(c1[mask])*dzl*dzs )
-        c2_chi.append( np.sum(c2[mask])*dzl*dzs )
-    c0_chi = np.array(c0_chi)
-    c1_chi = np.array(c1_chi)
-    c2_chi = np.array(c2_chi)
+
+    # The old code summed c[zl > z, zs > z] separately for every z. Both zl and zs
+    # are sorted, so that mask is the rectangle [i(z):, j(z):] and all 100 sums are
+    # one reverse 2-D cumulative sum plus a lookup. (The zs > zl condition the old
+    # mask appeared to carry never applied: it sat in np.logical_and's `out` slot,
+    # so it was overwritten -- and it is redundant anyway, since c is already zero
+    # there.) Exact, not an approximation: only the summation order changes.
+    def _rect_sums(c):
+        tot = np.cumsum(np.cumsum(c[::-1, ::-1], axis=0), axis=1)[::-1, ::-1]
+        tot = np.pad(tot, ((0, 1), (0, 1)))     # allow the empty-rectangle index
+        return tot
+    js = np.searchsorted(zl, z, side="right")   # first lens index with zl > z
+    is_ = np.searchsorted(zs, z, side="right")  # first source index with zs > z
+    c0_chi, c1_chi, c2_chi = (_rect_sums(c)[is_, js] * dzl * dzs for c in (c0, c1, c2))
     # print(c0_chi, c1_chi, c2_chi)
     
     window = (c0_chi - c1_chi*chi + c2_chi*chi**2)*(1+z)**2

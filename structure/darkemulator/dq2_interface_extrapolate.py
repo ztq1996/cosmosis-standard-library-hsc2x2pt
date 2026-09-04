@@ -22,7 +22,13 @@ above the emulator's kmax the z ordering of Pnl/Plin can invert (z = 3 crossing
 above z = 0), which is unphysical. Keep extrap_kmax to what the consumer
 actually needs rather than padding it.
 
-Author: Sunao Sugiyama / Keitaro Ishikawa
+save_sigma8 (default T) controls whether sigma_8 / S_8 are written. Set it to F
+in a pipeline whose reported sigma_8 comes from Dark Emulator I: the two
+emulators build the linear P(k) differently and disagree by 0.27%, so leaving it
+on makes the consistency check below fire (or, if this module runs first,
+silently hands over a value that darkemu_sigma8 then overwrites).
+
+Author: Ryo Terasawa / Sunao Sugiyama / Keitaro Ishikawa
 """
 import warnings
 import dq2emu
@@ -59,8 +65,11 @@ def setup(options):
     extrap["nmax"] = options.get_int(opt, "extrap_nmax", default=200)
     extrap["sn"] = options.get_double(opt, "extrap_sn", default=10)
     extrap["shotnoise"] = (lbox/npart)**3
-    
-    
+
+    # F when the pipeline reports Dark Emulator I's sigma_8 (see the docstring).
+    save_sigma8 = options.get_bool(opt, "save_sigma8", default=True)
+
+
     cc = dq2emu.PsConfig(
             nz=nz, zmax=zmax,
             logkh_min=logkhmin,
@@ -70,7 +79,7 @@ def setup(options):
             )
     emulator = dq2emu.DQ2Emu(cc)
             
-    return emulator, extrap
+    return emulator, extrap, save_sigma8
 
 def get_input_pars(block):
     params = {
@@ -115,7 +124,7 @@ def linear_extend(x, y, xmin, xmax, nmin, nmax, nfit, x2=None):
 
 def execute(block, config):
     # preparation
-    emulator, extrap = config
+    emulator, extrap, save_sigma8 = config
     nz = emulator.nz
     k_h = emulator.ks
 
@@ -131,16 +140,23 @@ def execute(block, config):
     shotnoise = extrap['shotnoise']
     
     # save sigma8 and S8
-    # NOTE: this assert fires if another module already wrote sigma_8 from a
-    # different linear P(k) -- in particular darkemu_sigma8 (Dark Emulator I).
-    # Use darkemu2_sigma8 instead, or drop it entirely since this module
-    # already writes sigma_8 / S_8 itself.
-    sigma8 =  emulator.get_sigma8(params)
-    if block.has_value(cosmo_pars, "sigma_8"):
-        assert np.isclose(sigma8, block[cosmo_pars, "sigma_8"])
-    block[cosmo_pars, "sigma_8"] = sigma8
-    block[cosmo_pars, "S_8"] = sigma8 * np.sqrt(block[cosmo_pars, "omega_m"] / 0.3)
-    
+    if save_sigma8:
+        sigma8 = emulator.get_sigma8(params)
+        # Fires when another module already wrote sigma_8 from a different
+        # linear P(k) -- in particular darkemu_sigma8 (Dark Emulator I), which
+        # disagrees by 0.27%. Set save_sigma8 = F to keep that module's value.
+        if block.has_value(cosmo_pars, "sigma_8"):
+            other = block[cosmo_pars, "sigma_8"]
+            if not np.isclose(sigma8, other):
+                raise ValueError(
+                    "sigma_8 is already in the datablock from another module "
+                    "(%.6f) and disagrees with Dark Emulator 2 (%.6f). Set "
+                    "save_sigma8 = F in this module's ini section to keep the "
+                    "existing value." % (other, sigma8))
+        block[cosmo_pars, "sigma_8"] = sigma8
+        block[cosmo_pars, "S_8"] = sigma8 * np.sqrt(block[cosmo_pars, "omega_m"] / 0.3)
+
+
     # linear and nonlinear power spectrum
     pk_lin_table, pk_nl_table = emulator.compute_pk_table(params)
     
